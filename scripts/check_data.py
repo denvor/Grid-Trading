@@ -10,9 +10,13 @@
 """
 import argparse
 import json
+import os
 import statistics
 import sys
 from datetime import datetime, timezone
+
+# 把项目根目录加入 path，让 `import app` 在直接运行脚本时可用
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from app.backtest.database import (
     init_db, get_db_path,

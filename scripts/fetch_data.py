@@ -6,10 +6,14 @@
     python fetch_data.py --symbol ETHUSDT --interval 15m --start 2024-06-01 --force
 """
 import argparse
+import os
 import shutil
 import sys
 import time
 from datetime import datetime, timezone
+
+# 把项目根目录加入 path，让 `import app` 在直接运行脚本时可用
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from app.backtest.data_fetcher import (
     fetch_klines_paginated,
