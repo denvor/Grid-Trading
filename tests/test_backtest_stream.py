@@ -100,13 +100,14 @@ class TestStreamRoute:
         body = r.data.decode()
         assert "event: done" in body
         # 提取 done 事件的 data JSON
-        for line in body.split("\n"):
-            if line.startswith("event: done"):
-                break
-        # 找下一个 data: 行
         lines = body.split("\n")
-        done_idx = next(i for i, l in enumerate(lines) if l.startswith("event: done"))
-        data_line = lines[done_idx + 1] if done_idx + 1 < len(lines) else ""
+        # progress 事件应在 done 之前多次出现
+        progress_indices = [i for i, l in enumerate(lines) if l.startswith("event: progress")]
+        done_indices = [i for i, l in enumerate(lines) if l.startswith("event: done")]
+        assert len(progress_indices) >= 2, f"应多次推 progress，实际 {len(progress_indices)} 次"
+        assert progress_indices[0] < done_indices[0], "第一个 progress 应在 done 之前"
+        # 解析 done 的 payload
+        data_line = lines[done_indices[0] + 1] if done_indices[0] + 1 < len(lines) else ""
         assert data_line.startswith("data: ")
         payload = json.loads(data_line[6:])
         assert "result" in payload

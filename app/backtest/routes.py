@@ -212,6 +212,9 @@ def backtest_index():
 @backtest_bp.route("/backtest/stream")
 def stream_backtest():
     """SSE 流式回测进度。GET 参数同 POST /backtest 表单。"""
+    import queue
+    import threading
+
     from app.backtest.engine import backtest
 
     params, errors = _parse_stream_query(request.args.to_dict())
@@ -232,12 +235,13 @@ def stream_backtest():
                                f"--interval {params['interval']} --start {params['start_time']} "
                                f"--end {params['end_time']}"}), 400
 
-    total_klines = len(klines)
+    # 线程安全队列：后台回测线程推 progress，generator 实时消费
+    q = queue.Queue()
+    _SENTINEL = object()  # 结束标记
 
     def _progress_callback(percent, kline_index, total, elapsed_ms, trades_count):
-        """把进度推给浏览器。"""
         eta_ms = int((elapsed_ms / max(percent, 1)) * (100 - percent)) if percent > 0 else 0
-        payload = json.dumps({
+        q.put({
             "percent": percent,
             "kline_index": kline_index,
             "total_klines": total,
@@ -245,18 +249,10 @@ def stream_backtest():
             "eta_ms": eta_ms,
             "trades_count": trades_count,
         })
-        yield f"event: progress\ndata: {payload}\n\n"
 
-    def _generate():
-        """Generator: 每秒推 progress，最终推 done/error。"""
-        yield f"retry: 5000\n\n"
-        # 把 progress_callback 队列化（callback → list → pop）
-        progress_queue = []
-        def cb(percent, kline_index, total, elapsed_ms, trades_count):
-            progress_queue.append((percent, kline_index, total, elapsed_ms, trades_count))
-
+    def _worker():
+        """后台线程跑回测，完成后 put sentinel。"""
         try:
-            # 跑回测（与 POST /backtest 共用逻辑）
             result = backtest(
                 klines=klines,
                 capital=params["capital"],
@@ -264,34 +260,42 @@ def stream_backtest():
                 lower_price=params["lower_price"],
                 grid_size=params["grid_size"],
                 quantity_per_grid=params["quantity_per_grid"],
-                progress_callback=cb,
+                progress_callback=_progress_callback,
             )
-            # 把积压的 progress 全部排出
-            while progress_queue:
-                p = progress_queue.pop(0)
-                eta_ms = 0
-                if p[0] > 0:
-                    eta_ms = int((p[3] / p[0]) * (100 - p[0]))
-                payload = json.dumps({
-                    "percent": p[0],
-                    "kline_index": p[1],
-                    "total_klines": p[2],
-                    "elapsed_ms": p[3],
-                    "eta_ms": eta_ms,
-                    "trades_count": p[4],
-                })
-                yield f"event: progress\ndata: {payload}\n\n"
-            # 最终 done 事件（Decimal → str 以便 JSON 序列化）
-            def _decimal_to_str(obj):
-                if isinstance(obj, Decimal):
-                    return str(obj)
-                raise TypeError
-            payload = json.dumps({"result": result, "elapsed_ms": result["elapsed_ms"]},
-                                 default=_decimal_to_str)
-            yield f"event: done\ndata: {payload}\n\n"
+            q.put(("done", result))
         except Exception as e:
-            payload = json.dumps({"error": str(e)})
-            yield f"event: error\ndata: {payload}\n\n"
+            q.put(("error", str(e)))
+        finally:
+            q.put(_SENTINEL)
+
+    t = threading.Thread(target=_worker, daemon=True)
+    t.start()
+
+    def _generate():
+        """Generator: 实时消费队列，推 SSE 帧。"""
+        yield "retry: 5000\n\n"
+        while True:
+            item = q.get()
+            if item is _SENTINEL:
+                break
+            if isinstance(item, tuple):
+                # done / error 最终事件
+                kind, payload = item
+                if kind == "done":
+                    def _decimal_to_str(obj):
+                        if isinstance(obj, Decimal):
+                            return str(obj)
+                        raise TypeError
+                    data = json.dumps({"result": payload, "elapsed_ms": payload["elapsed_ms"]},
+                                      default=_decimal_to_str)
+                    yield f"event: done\ndata: {data}\n\n"
+                else:
+                    data = json.dumps({"error": payload})
+                    yield f"event: error\ndata: {data}\n\n"
+                break
+            else:
+                # progress 事件
+                yield f"event: progress\ndata: {json.dumps(item)}\n\n"
 
     return Response(stream_with_context(_generate()),
                     mimetype="text/event-stream",
