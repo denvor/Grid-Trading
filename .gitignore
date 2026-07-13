@@ -171,6 +171,10 @@ data/
 fake.db
 1h
 
+# ── 规划 / 文档（非代码） ──
+openspec/
+docs/
+
 # ── IDE / MCP / 编辑器 临时 ──
 .claude/
 .playwright-mcp/
