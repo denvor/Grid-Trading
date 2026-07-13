@@ -270,11 +270,14 @@ function startStreamBacktest() {
     });
 
     es.addEventListener('done', function (e) {
-        // 重定向到完整 result 页
+        // 先关闭 SSE 连接，再重定向（避免浏览器报连接错误）
+        es.close();
         window.location.href = '/backtest/result?jobid=' + JSON.parse(e.data).jobid;
     });
 
     es.addEventListener('error', function () {
+        // 若已收到 done 后重定向，忽略后续 error
+        if (es.readyState === EventSource.CLOSED) return;
         es.close();
         term.innerHTML += '<div class="t-line t-error">✗ 连接错误，请刷新重试。</div>';
         document.getElementById('backtest-submit-btn').disabled = false;
