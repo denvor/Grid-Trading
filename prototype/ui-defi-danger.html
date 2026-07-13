@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Grid calc — DeFi danger</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;700;900&family=Satoshi:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        :root { --bg: #0d0b1f; --surface: rgba(255,255,255,0.03); --card: rgba(255,255,255,0.05); --border: rgba(255,255,255,0.08); --text: #e8e0f0; --dim: #7c6f96; --purple: #a855f7; --cyan: #22d3ee; --green: #10b981; --red: #ef4444; }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Outfit', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; padding: 40px 20px; font-size: 14px; }
+        body::before { content: ''; position: fixed; inset: 0;
+            background: radial-gradient(ellipse 60% 40% at 80% 30%, rgba(239,68,68,0.12) 0%, transparent 50%), radial-gradient(ellipse 50% 30% at 20% 70%, rgba(168,85,247,0.1) 0%, transparent 50%);
+            pointer-events: none; z-index: 0;
+        }
+        .container { max-width: 680px; margin: 0 auto; position: relative; z-index: 1; }
+        .brand { display: flex; align-items: center; gap: 12px; margin-bottom: 40px; }
+        .brand-logo { width: 40px; height: 40px; background: linear-gradient(135deg, var(--purple), var(--cyan)); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 20px; font-weight: 900; }
+        .brand-name { font-size: 22px; font-weight: 900; letter-spacing: -1px; }
+        .glass { background: var(--card); backdrop-filter: blur(16px); border: 1px solid var(--border); border-radius: 16px; padding: 28px; margin-bottom: 16px; }
+        .result-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
+        .result-title { font-size: 20px; font-weight: 700; }
+        .mode-tag { background: rgba(255,255,255,0.05); padding: 6px 12px; border-radius: 100px; border: 1px solid var(--border); font-size: 12px; color: var(--dim); }
+        .safety-badge { text-align: center; padding: 32px 20px; border-radius: 16px; margin-bottom: 24px; border: 1px solid rgba(239,68,68,0.3); background: linear-gradient(135deg, rgba(239,68,68,0.15), rgba(168,85,247,0.1)); }
+        .safety-icon { font-size: 32px; margin-bottom: 8px; }
+        .safety-value { font-family: 'Satoshi', sans-serif; font-size: 52px; font-weight: 700; letter-spacing: -2px; background: linear-gradient(135deg, var(--red), var(--purple)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .safety-sub { font-size: 14px; color: var(--red); margin-top: 4px; }
+        .metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 24px; }
+        .metric { text-align: center; padding: 16px 8px; }
+        .metric .v { font-family: 'Satoshi', sans-serif; font-size: 24px; font-weight: 700; margin-bottom: 2px; }
+        .metric .l { font-size: 10px; color: var(--dim); text-transform: uppercase; }
+        .metric .v.red { background: linear-gradient(135deg, var(--red), var(--purple)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .metric .v.purple { background: linear-gradient(135deg, var(--purple), var(--cyan)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .alerts { margin-bottom: 24px; }
+        .alert { display: flex; gap: 12px; padding: 14px 18px; border-radius: 10px; font-size: 13px; line-height: 1.5; margin-bottom: 8px; }
+        .alert.danger { background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.3); color: var(--red); }
+        .alert.warn { background: rgba(168,85,247,0.1); border: 1px solid rgba(168,85,247,0.3); color: var(--purple); }
+        .back-btn { display: inline-flex; align-items: center; gap: 6px; color: var(--dim); text-decoration: none; font-size: 13px; margin-top: 20px; padding: 8px 14px; border: 1px solid var(--border); border-radius: 8px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="brand">
+            <div class="brand-logo">G</div>
+            <div class="brand-name">grid·calc</div>
+        </div>
+        <div class="glass">
+            <div class="result-header">
+                <div class="result-title">⟠ ETHUSDT</div>
+                <div class="mode-tag">全仓 · 10×</div>
+            </div>
+            <div class="safety-badge">
+                <div class="safety-icon" style="font-size:32px;">💥</div>
+                <div class="safety-value">58,500.00</div>
+                <div class="safety-sub">触及网格下限即爆仓</div>
+            </div>
+            <div class="metrics">
+                <div class="metric"><div class="v purple">20</div><div class="l">网格数</div></div>
+                <div class="metric"><div class="v purple">3.00</div><div class="l">单格利润</div></div>
+                <div class="metric"><div class="v red">130,000</div><div class="l">总占用 USDT</div></div>
+                <div class="metric"><div class="v red">153%</div><div class="l">最大回撤</div></div>
+            </div>
+            <div class="alerts">
+                <div class="alert danger">资金不足：总占用 130,000 USDT 超出初始资金 30,000 USDT</div>
+                <div class="alert warn">建议：将网格下限提高至 64,706 USDT 以上，或降低杠杆至 5× 以下</div>
+            </div>
+            <a href="ui-defi.html" class="back-btn">← 重新测算</a>
+        </div>
+    </div>
+</body>
+</html>

@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Grid calc — Danger</title>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+    <style>
+        :root { --bg: #0a0b0f; --surface: #12141c; --card: #1a1d29; --border: #252833; --text: #e1e4eb; --dim: #6b7280; --blue: #2f81f7; --green: #3fb950; --amber: #d29922; --red: #f85149; }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; padding: 32px 20px; font-size: 14px; }
+        .container { max-width: 640px; margin: 0 auto; }
+        .header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 32px; }
+        .logo { font-family: 'Space Grotesk', sans-serif; font-size: 18px; font-weight: 700; letter-spacing: -0.5px; }
+        .logo span { color: var(--blue); }
+        .result-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 28px; margin-bottom: 16px; }
+        .result-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; }
+        .result-title { font-family: 'Space Grotesk', sans-serif; font-size: 18px; font-weight: 700; }
+        .mode-chip { background: var(--card); border: 1px solid var(--border); padding: 4px 10px; border-radius: 100px; font-size: 11px; color: var(--dim); font-weight: 500; }
+        .safety-panel { background: rgba(248,81,73,0.08); border: 1px solid var(--red); border-radius: 10px; padding: 20px; margin-bottom: 24px; }
+        .safety-row { display: flex; align-items: center; justify-content: space-between; }
+        .safety-label { font-size: 12px; color: var(--dim); text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 4px; }
+        .safety-value { font-family: 'Space Grotesk', sans-serif; font-size: 36px; font-weight: 700; color: var(--red); }
+        .safety-sub { font-size: 13px; color: var(--red); margin-top: 2px; }
+        .margin-pct { font-size: 13px; color: var(--dim); text-align: right; }
+        .margin-pct strong { color: var(--red); font-size: 20px; font-family: 'Space Grotesk', sans-serif; }
+        .metrics-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 24px; }
+        .metric { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 16px; }
+        .metric .label { font-size: 11px; color: var(--dim); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
+        .metric .value { font-family: 'Space Grotesk', sans-serif; font-size: 22px; font-weight: 700; }
+        .metric .value.red { color: var(--red); }
+        .metric .value.amber { color: var(--amber); }
+        .alerts { margin-bottom: 24px; }
+        .alert { display: flex; gap: 10px; padding: 12px 16px; border-radius: 8px; font-size: 13px; margin-bottom: 8px; }
+        .alert.danger { background: rgba(248,81,73,0.1); border: 1px solid rgba(248,81,73,0.3); color: var(--red); }
+        .alert.warn { background: rgba(210,153,34,0.1); border: 1px solid rgba(210,153,34,0.3); color: var(--amber); }
+        .btn-secondary { display: inline-block; padding: 10px 20px; background: var(--card); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-family: 'DM Sans', sans-serif; font-size: 14px; text-decoration: none; margin-top: 20px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="logo">grid<span>·</span>calc</div>
+            <div style="font-size:13px; color:var(--red);">⚠ 2 alerts</div>
+        </div>
+
+        <div class="result-card">
+            <div class="result-header">
+                <div class="result-title">ETHUSDT 测算结果</div>
+                <div class="mode-chip">全仓 · 10×</div>
+            </div>
+            <div class="safety-panel">
+                <div class="safety-row">
+                    <div>
+                        <div class="safety-label">爆仓价</div>
+                        <div class="safety-value">58,500.00</div>
+                        <div class="safety-sub">距网格下限仅 0%（触及即爆）</div>
+                    </div>
+                    <div class="margin-pct">保证金占用<strong>100%</strong></div>
+                </div>
+            </div>
+            <div class="metrics-grid">
+                <div class="metric"><div class="label">网格数量</div><div class="value">20 格</div></div>
+                <div class="metric"><div class="label">单次利润</div><div class="value" style="color:var(--green)">3.00 USDT</div></div>
+                <div class="metric"><div class="label">最大回撤</div><div class="value red">153.85%</div></div>
+                <div class="metric"><div class="label">总占用/资金</div><div class="value red">130,000 USDT</div></div>
+            </div>
+            <div class="alerts">
+                <div class="alert danger">资金不足：总占用 130,000 USDT 超出初始资金 30,000 USDT</div>
+                <div class="alert warn">建议：将网格下限提高至 64,706 USDT 以上，或降低杠杆至 5× 以下</div>
+            </div>
+            <a href="ui-fintech.html" class="btn-secondary">← 重新测算</a>
+        </div>
+    </div>
+</body>
+</html>

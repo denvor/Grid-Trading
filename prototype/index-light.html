@@ -1,0 +1,238 @@
+<!DOCTYPE html><html lang="zh-CN" data-bs-theme="light"><head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>参数输入 — 网格交易测算</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;700;900&amp;family=Satoshi:wght@400;700&amp;display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="http://192.168.199.171:5000/static/vendor/bootstrap.min.css">
+    <link rel="stylesheet" href="http://192.168.199.171:5000/static/style.css">
+</head>
+<body class="light">
+<script>
+// FOUC 防护：在 body 标签后立刻执行（此时 DOM 已解析到 body，CSS 尚未 paint）
+(function() {
+    try {
+        var t = localStorage.getItem('theme') || 'light';
+        if (t === 'system') {
+            t = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+        }
+        document.documentElement.setAttribute('data-bs-theme', t);
+        document.body.className = (t === 'dark') ? 'bk' : 'light';
+    } catch (e) {}
+})();
+</script>
+<div class="container py-3">
+    <!-- 品牌 -->
+    <div class="brand">
+        <div class="brand-logo">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M3 3h18v18H3zM3 9h18M3 15h18M9 3v18M15 3v18"></path></svg>
+        </div>
+        <div class="brand-name">grid<span>·</span>calc</div>
+    </div>
+
+    <!-- 导航栏 -->
+    <div class="d-flex align-items-center justify-content-between mb-3">
+        <nav class="nav nav-pills mb-0">
+            <a class="nav-link active" href="/">资金计算</a>
+            <a class="nav-link " href="/backtest">回测</a>
+            <a class="nav-link " href="/data">数据展示</a>
+        </nav>
+        <!-- 主题切换 -->
+        <div class="btn-group btn-group-sm theme-toggle" role="group" aria-label="主题切换">
+            <button type="button" class="btn btn-outline-secondary active" data-theme="light" id="theme-light">亮</button>
+            <button type="button" class="btn btn-outline-secondary" data-theme="dark" id="theme-dark">暗</button>
+            <button type="button" class="btn btn-outline-secondary" data-theme="system" id="theme-system">跟随</button>
+        </div>
+    </div>
+
+    
+<form method="POST" action="/" class="glass">
+    
+
+    <div class="row g-3 mb-3">
+        <div class="col-md-6">
+            <label class="form-label">币种</label>
+            <select class="form-select" name="symbol" id="symbol" required="">
+                
+                <option value="BTCUSDT" selected="" data-entry="65000" data-upper-pct="10" data-lower-pct="10" data-grid-size="500" data-quantity="0.01" data-capital="1000">
+                    BTCUSDT (Bitcoin)
+                </option>
+                
+                <option value="ETHUSDT" data-entry="3500" data-upper-pct="12" data-lower-pct="12" data-grid-size="30" data-quantity="0.1" data-capital="1000">
+                    ETHUSDT (Ethereum)
+                </option>
+                
+                <option value="BNBUSDT" data-entry="600" data-upper-pct="15" data-lower-pct="15" data-grid-size="10" data-quantity="0.5" data-capital="1000">
+                    BNBUSDT (BNB)
+                </option>
+                
+            </select>
+        </div>
+        <div class="col-md-6">
+            <label class="form-label">保证金模式</label>
+            <div class="btn-group w-100" role="group">
+                <button type="button" id="btn-cross" class="btn btn-outline-light active" onclick="setMode('cross')">全仓</button>
+                <button type="button" id="btn-isolated" class="btn btn-outline-light" onclick="setMode('isolated')">逐仓</button>
+            </div>
+            <input type="hidden" name="margin_mode" id="margin_mode" value="cross">
+        </div>
+    </div>
+
+    <div class="row g-3 mb-3">
+        <div class="col-md-6">
+            <label class="form-label">初始资金</label>
+            <input type="number" step="0.01" class="form-control" name="capital" id="capital" min="0" required="" value="1000">
+        </div>
+        <div class="col-md-6">
+            <label class="form-label">杠杆</label>
+            <input type="number" step="1" class="form-control" name="leverage" id="leverage" min="1" max="125" required="" value="1">
+        </div>
+    </div>
+
+    <div class="mb-3">
+        <label class="form-label">入场价</label>
+        <input type="number" step="0.01" class="form-control" name="entry_price" id="entry_price" required="" value="65000">
+    </div>
+
+    <div class="row g-3 mb-3">
+        <div class="col-md-4">
+            <label class="form-label">网格下限 (USDT)</label>
+            <input type="number" step="0.01" class="form-control" name="lower_price" id="lower_price" required="" value="58500.00">
+        </div>
+        <div class="col-md-4">
+            <label class="form-label">网格上限 (USDT)</label>
+            <input type="number" step="0.01" class="form-control" name="upper_price" id="upper_price" required="" value="71500.00">
+        </div>
+        <div class="col-md-4">
+            <label class="form-label">网格大小 (USDT)</label>
+            <input type="number" step="0.01" class="form-control" name="grid_size" id="grid_size" required="" value="500">
+        </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-md-4">
+            <label class="form-label">单次购买</label>
+            <input type="number" step="any" class="form-control" name="quantity_per_grid" id="quantity_per_grid" min="0" required="" value="0.01">
+        </div>
+        <div class="col-md-4">
+            <label class="form-label">网格数量</label>
+            <input type="text" class="form-control-plaintext text-center" id="grid_count_preview" readonly="" value="-">
+        </div>
+        <div class="col-md-4">
+            <label class="form-label">总占用</label>
+            <input type="text" class="form-control-plaintext text-center" id="total_used_preview" readonly="" value="-">
+        </div>
+    </div>
+
+    <button type="submit" class="btn-glow">▶ 开始测算</button>
+</form>
+
+<script>
+function setMode(mode) {
+    document.getElementById('margin_mode').value = mode;
+    document.getElementById('btn-cross').classList.toggle('active', mode === 'cross');
+    document.getElementById('btn-isolated').classList.toggle('active', mode === 'isolated');
+}
+
+function fillDefaults() {
+    const sel = document.getElementById('symbol');
+    const opt = sel.options[sel.selectedIndex];
+    const entry = parseFloat(opt.dataset.entry);
+    const upperPct = parseFloat(opt.dataset.upperPct);
+    const lowerPct = parseFloat(opt.dataset.lowerPct);
+    if (!document.getElementById('entry_price').value) document.getElementById('entry_price').value = entry;
+    if (!document.getElementById('upper_price').value) document.getElementById('upper_price').value = (entry * (1 + upperPct / 100)).toFixed(2);
+    if (!document.getElementById('lower_price').value) document.getElementById('lower_price').value = (entry * (1 - lowerPct / 100)).toFixed(2);
+    if (!document.getElementById('grid_size').value) document.getElementById('grid_size').value = opt.dataset.gridSize;
+    if (!document.getElementById('quantity_per_grid').value) document.getElementById('quantity_per_grid').value = opt.dataset.quantity;
+    if (!document.getElementById('capital').value) document.getElementById('capital').value = opt.dataset.capital;
+    updatePreview();
+}
+
+function updatePreview() {
+    const upper = parseFloat(document.getElementById('upper_price').value) || 0;
+    const lower = parseFloat(document.getElementById('lower_price').value) || 0;
+    const gridSize = parseFloat(document.getElementById('grid_size').value) || 1;
+    const qty = parseFloat(document.getElementById('quantity_per_grid').value) || 0;
+    const lev = parseFloat(document.getElementById('leverage').value) || 1;
+    const entry = parseFloat(document.getElementById('entry_price').value) || 0;
+
+    if (upper > lower && gridSize > 0) {
+        const count = Math.ceil((upper - lower) / gridSize);
+        document.getElementById('grid_count_preview').value = count + ' 格';
+        const nominal = (qty * entry * count / lev);
+        document.getElementById('total_used_preview').value = nominal.toFixed(2) + ' USDT';
+    }
+}
+
+document.getElementById('symbol').addEventListener('change', fillDefaults);
+['upper_price','lower_price','grid_size','quantity_per_grid','leverage','entry_price'].forEach(id => {
+    document.getElementById(id).addEventListener('input', updatePreview);
+});
+window.addEventListener('DOMContentLoaded', function() {
+    fillDefaults();
+    updatePreview();
+});
+
+
+</script>
+
+
+    <footer class="footer">
+        <p class="disclaimer">⚠️ 本工具使用简化模型测算，未计入资金费率、手续费、维持保证金。结果仅供参考。</p>
+    </footer>
+</div>
+
+<script src="http://192.168.199.171:5000/static/vendor/bootstrap.bundle.min.js"></script>
+<script>
+// 主题切换：dark → light → system → dark
+(function() {
+    var cycle = ['dark', 'light', 'system'];
+    var buttons = {
+        dark: document.getElementById('theme-dark'),
+        light: document.getElementById('theme-light'),
+        system: document.getElementById('theme-system')
+    };
+
+    function applyTheme(state) {
+        var resolved = state;
+        if (state === 'system') {
+            resolved = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+        }
+        document.documentElement.setAttribute('data-bs-theme', resolved);
+        document.body.className = (resolved === 'dark') ? 'bk' : 'light';
+        localStorage.setItem('theme', state);
+        // 更新按钮高亮
+        ['dark', 'light', 'system'].forEach(function(s) {
+            if (buttons[s]) buttons[s].classList.toggle('active', s === state);
+        });
+    }
+
+    // 初始化当前按钮高亮
+    var current = localStorage.getItem('theme') || 'light';
+    if (buttons[current]) buttons[current].classList.add('active');
+
+    // 点击即设成该主题
+    ['dark', 'light', 'system'].forEach(function(s) {
+        if (!buttons[s]) return;
+        buttons[s].addEventListener('click', function() {
+            applyTheme(s);
+        });
+    });
+
+    // 监听系统主题变更（仅在 system 模式下生效）
+    if (window.matchMedia) {
+        try {
+            window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', function(e) {
+                var saved = localStorage.getItem('theme') || 'dark';
+                if (saved !== 'system') return;
+                var resolved = e.matches ? 'light' : 'dark';
+                document.documentElement.setAttribute('data-bs-theme', resolved);
+                document.body.className = (resolved === 'dark') ? 'bk' : 'light';
+            });
+        } catch (e) {}
+    }
+})();
+</script>
+
+
+</body></html>

@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+{% block title %}测算结果 — 网格交易测算{% endblock %}
+{% block content %}
+<div class="glass">
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h5 class="mb-0 fw-bold">{{ params.symbol }}</h5>
+    <span class="badge bg-secondary-subtle text-light border">
+        {{ "逐仓" if params.margin_mode == "isolated" else "全仓" }} · {{ params.leverage }}×
+    </span>
+</div>
+
+<!-- 安全状态徽章 -->
+<div class="safety-badge {{ result.safety.level }}">
+    <div class="safety-icon">{{ "✓" if result.safety.level == "safe" else ("⚠" if result.safety.level == "warning" else "💥") }}</div>
+    <div class="safety-value">
+        {% if result.liquidation_price <= 0 %}0.00{% else %}{{ result.liquidation_price }}{% endif %}
+    </div>
+    <div class="safety-sub">
+        {% if not result.capital.sufficient %}
+            资金不足 · 总占用 {{ result.grid.total_capital_used }} USDT 超出本金 {{ result.capital.initial }} USDT
+        {% elif result.liquidation_price <= 0 %}
+            无爆仓风险 · 保证金仅占用 {{ "%.1f"|format(result.grid.total_capital_used / result.capital.initial * 100) }}%
+        {% elif result.safety.level == "warning" %}
+            安全边际不足 · 距下限 {{ "%.1f"|format((result.safety.buffer_pct)) }}%
+        {% else %}
+            下限距爆仓价仅 {{ "%.1f"|format(result.safety.buffer_pct) }}%
+        {% endif %}
+    </div>
+</div>
+
+<!-- 关键指标 -->
+<div class="row g-3 mb-4">
+    <div class="col-6 col-md-3">
+        <div class="card text-center bg-transparent border-secondary">
+            <div class="card-body py-2">
+                <div class="metric-value green">{{ result.grid.grid_count }}</div>
+                <div class="metric-label">网格数</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="card text-center bg-transparent border-secondary">
+            <div class="card-body py-2">
+                <div class="metric-value purple">{{ result.grid.profit_per_grid }}</div>
+                <div class="metric-label">单格利润</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="card text-center bg-transparent border-secondary">
+            <div class="card-body py-2">
+                <div class="metric-value purple">{{ result.grid.total_capital_used }}</div>
+                <div class="metric-label">总占用 USDT</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="card text-center bg-transparent border-secondary">
+            <div class="card-body py-2">
+                {% if result.max_drawdown > 100 %}
+                <div class="metric-value red">>100%</div>
+                {% else %}
+                <div class="metric-value {{ 'green' if result.max_drawdown < 80 else 'red' }}">{{ "%.1f"|format(result.max_drawdown) }}%</div>
+                {% endif %}
+                <div class="metric-label">最大回撤</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 资金占用条 -->
+{% set pct = (result.grid.total_capital_used / result.capital.initial * 100) %}
+<div class="progress mb-2" style="height: 8px;">
+    <div class="progress-bar" style="width: {{ pct if pct < 100 else 100 }}%"></div>
+</div>
+<div class="d-flex justify-content-between mb-3">
+    <span class="text-muted small">占用 {{ result.grid.total_capital_used }} USDT</span>
+    <span class="text-muted small">总资金 {{ result.capital.initial }} USDT</span>
+</div>
+
+<!-- 详细数据 -->
+<div class="table-responsive mb-3">
+    <table class="table table-dark table-sm table-borderless mb-0">
+        <tbody>
+            <tr>
+                <td class="text-muted">安全边际</td>
+                <td class="text-end fw-semibold {{ 'text-success' if result.safety.level == 'safe' else 'text-danger' }}">{{ result.safety.buffer_pct }}%</td>
+            </tr>
+            <tr>
+                <td class="text-muted">单次购买</td>
+                <td class="text-end fw-semibold">{{ result.grid.quantity_per_grid }} 币</td>
+            </tr>
+            <tr>
+                <td class="text-muted">单次名义价值</td>
+                <td class="text-end fw-semibold">{{ result.grid.nominal_per_grid }} USDT</td>
+            </tr>
+            <tr>
+                <td class="text-muted">剩余资金</td>
+                <td class="text-end fw-semibold {{ 'text-success' if result.capital.sufficient else 'text-danger' }}">{{ result.capital.remaining }} USDT{% if not result.capital.sufficient %}（不足）{% endif %}</td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+
+{% if result.suggestions %}
+<div class="suggestion {{ 'danger' if result.safety.level == 'danger' else '' }}">
+    <span class="icon">{{ "✓" if result.safety.level == "safe" else ("⚠" if result.safety.level == "warning" else "💥") }}</span>
+    <div class="suggestion-list">
+        {% for s in result.suggestions %}<div>{{ s }}</div>{% endfor %}
+    </div>
+</div>
+{% endif %}
+
+<a href="/?symbol={{ params.symbol }}&capital={{ params.capital }}&leverage={{ params.leverage }}&entry_price={{ params.entry_price }}&upper_price={{ params.upper_price }}&lower_price={{ params.lower_price }}&grid_size={{ params.grid_size }}&quantity_per_grid={{ params.quantity_per_grid }}&margin_mode={{ params.margin_mode }}" class="back-btn mt-3">← 重新测算</a>
+</div>
+{% endblock %}

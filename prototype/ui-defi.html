@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Grid calc — DeFi</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;700;900&family=Satoshi:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #0d0b1f;
+            --surface: rgba(255,255,255,0.03);
+            --card: rgba(255,255,255,0.05);
+            --border: rgba(255,255,255,0.08);
+            --glow-purple: 0 0 30px rgba(168,85,247,0.15);
+            --glow-cyan: 0 0 30px rgba(34,211,238,0.15);
+            --text: #e8e0f0;
+            --dim: #7c6f96;
+            --purple: #a855f7;
+            --cyan: #22d3ee;
+            --green: #10b981;
+            --red: #ef4444;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Outfit', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            padding: 40px 20px;
+            font-size: 14px;
+            overflow-x: hidden;
+        }
+        /* Background atmosphere */
+        body::before {
+            content: '';
+            position: fixed; inset: 0;
+            background:
+                radial-gradient(ellipse 60% 40% at 20% 30%, rgba(168,85,247,0.15) 0%, transparent 50%),
+                radial-gradient(ellipse 50% 30% at 80% 70%, rgba(34,211,238,0.1) 0%, transparent 50%),
+                url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.02'/%3E%3C/svg%3E");
+            pointer-events: none;
+            z-index: 0;
+        }
+        .container { max-width: 680px; margin: 0 auto; position: relative; z-index: 1; }
+
+        .brand {
+            display: flex; align-items: center; gap: 12px;
+            margin-bottom: 40px;
+        }
+        .brand-logo {
+            width: 40px; height: 40px;
+            background: linear-gradient(135deg, var(--purple), var(--cyan));
+            border-radius: 10px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 20px; font-weight: 900;
+            box-shadow: var(--glow-purple);
+        }
+        .brand-name { font-size: 22px; font-weight: 900; letter-spacing: -1px; }
+        .brand-name span { background: linear-gradient(135deg, var(--purple), var(--cyan)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+
+        .glass {
+            background: var(--card);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 28px;
+            margin-bottom: 16px;
+            position: relative;
+            overflow: hidden;
+        }
+        .glass::before {
+            content: '';
+            position: absolute; top: 0; left: 0; right: 0; height: 1px;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.15), transparent);
+        }
+
+        .form-group { margin-bottom: 20px; }
+        .form-group label {
+            font-size: 11px; color: var(--dim); text-transform: uppercase;
+            letter-spacing: 1.2px; margin-bottom: 8px; display: block;
+        }
+        .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+        .form-row.three { grid-template-columns: 1fr 1fr 1fr; }
+
+        .form-group input, .form-group select {
+            width: 100%;
+            background: rgba(255,255,255,0.04);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 12px 14px;
+            color: var(--text);
+            font-family: 'Outfit', sans-serif;
+            font-size: 15px;
+            transition: all 0.3s;
+        }
+        .form-group input:focus, .form-group select:focus {
+            outline: none;
+            border-color: var(--purple);
+            box-shadow: 0 0 0 3px rgba(168,85,247,0.2), var(--glow-purple);
+        }
+
+        .mode-toggle {
+            display: flex; gap: 4px;
+            background: rgba(255,255,255,0.04);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 4px;
+        }
+        .mode-toggle button {
+            flex: 1; padding: 8px;
+            background: transparent; border: none;
+            color: var(--dim); font-family: 'Outfit', sans-serif;
+            font-size: 13px; font-weight: 500;
+            border-radius: 8px; cursor: pointer;
+            transition: all 0.3s;
+        }
+        .mode-toggle button.active {
+            background: linear-gradient(135deg, var(--purple), var(--cyan));
+            color: #fff;
+            box-shadow: 0 0 15px rgba(168,85,247,0.3);
+        }
+
+        .btn-glow {
+            width: 100%; padding: 14px;
+            background: linear-gradient(135deg, var(--purple), var(--cyan));
+            color: #fff; border: none;
+            border-radius: 12px;
+            font-family: 'Outfit', sans-serif;
+            font-size: 16px; font-weight: 700;
+            cursor: pointer;
+            letter-spacing: 0.5px;
+            transition: all 0.3s;
+            box-shadow: 0 4px 20px rgba(168,85,247,0.3);
+            position: relative; overflow: hidden;
+        }
+        .btn-glow::before {
+            content: '';
+            position: absolute; inset: 0;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+            transform: translateX(-100%);
+            transition: transform 0.5s;
+        }
+        .btn-glow:hover { transform: translateY(-2px); box-shadow: 0 8px 30px rgba(168,85,247,0.4); }
+        .btn-glow:hover::before { transform: translateX(100%); }
+
+        /* Result page */
+        .safety-badge {
+            text-align: center;
+            padding: 32px 20px;
+            border-radius: 16px;
+            margin-bottom: 24px;
+            position: relative;
+            overflow: hidden;
+        }
+        .safety-badge.safe {
+            background: linear-gradient(135deg, rgba(16,185,129,0.15), rgba(34,211,238,0.1));
+            border: 1px solid rgba(16,185,129,0.3);
+        }
+        .safety-badge.danger {
+            background: linear-gradient(135deg, rgba(239,68,68,0.15), rgba(168,85,247,0.1));
+            border: 1px solid rgba(239,68,68,0.3);
+        }
+        .safety-badge.safe::after {
+            content: '';
+            position: absolute; inset: -50%;
+            background: radial-gradient(circle, rgba(16,185,129,0.1) 0%, transparent 70%);
+            animation: breathe 4s ease-in-out infinite;
+        }
+        @keyframes breathe { 0%, 100% { opacity: 0.5; } 50% { opacity: 1; } }
+        .safety-icon { font-size: 32px; margin-bottom: 8px; }
+        .safety-value {
+            font-family: 'Satoshi', sans-serif;
+            font-size: 52px; font-weight: 700;
+            letter-spacing: -2px;
+            background: linear-gradient(135deg, var(--green), var(--cyan));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .safety-badge.danger .safety-value {
+            background: linear-gradient(135deg, var(--red), var(--purple));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .safety-sub { font-size: 13px; color: var(--dim); margin-top: 4px; }
+
+        .metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 24px; }
+        .metric { text-align: center; padding: 16px 8px; }
+        .metric .v { font-family: 'Satoshi', sans-serif; font-size: 24px; font-weight: 700; margin-bottom: 2px; }
+        .metric .l { font-size: 10px; color: var(--dim); text-transform: uppercase; letter-spacing: 0.5px; }
+        .metric .v.green { background: linear-gradient(135deg, var(--green), var(--cyan)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .metric .v.purple { background: linear-gradient(135deg, var(--purple), var(--cyan)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+
+        .visual-bar {
+            height: 8px;
+            background: rgba(255,255,255,0.06);
+            border-radius: 4px;
+            position: relative;
+            margin: 24px 0 12px;
+            overflow: hidden;
+        }
+        .visual-bar .filled {
+            position: absolute; top: 0; bottom: 0; left: 0;
+            border-radius: 4px;
+            background: linear-gradient(90deg, var(--purple), var(--cyan));
+            box-shadow: 0 0 12px rgba(168,85,247,0.5);
+        }
+        .bar-labels { display: flex; justify-content: space-between; font-size: 11px; color: var(--dim); }
+
+        .suggestion {
+            display: flex; gap: 12px; align-items: flex-start;
+            padding: 14px 18px;
+            background: rgba(16,185,129,0.08);
+            border: 1px solid rgba(16,185,129,0.2);
+            border-radius: 10px;
+            font-size: 13px; line-height: 1.5;
+        }
+        .suggestion .icon { font-size: 16px; flex-shrink: 0; margin-top: 1px; }
+
+        .back-btn {
+            display: inline-flex; align-items: center; gap: 6px;
+            color: var(--dim); text-decoration: none;
+            font-size: 13px; margin-top: 20px;
+            padding: 8px 14px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            transition: all 0.2s;
+        }
+        .back-btn:hover { color: var(--purple); border-color: var(--purple); }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="brand">
+            <div class="brand-logo">G</div>
+            <div class="brand-name">grid<span>·span>calc</div>
+        </div>
+
+        <!-- INPUT -->
+        <div class="glass">
+            <div class="form-row" style="margin-bottom: 20px;">
+                <div class="form-group" style="margin-bottom:0">
+                    <label>币种</label>
+                    <select>
+                        <option>₿ BTCUSDT</option>
+                        <option>⟠ ETHUSDT</option>
+                        <option>⬡ BNBUSDT</option>
+                    </select>
+                </div>
+                <div class="form-group" style="margin-bottom:0">
+                    <label>保证金模式</label>
+                    <div class="mode-toggle">
+                        <button class="active">全仓</button>
+                        <button>逐仓</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-row" style="margin-bottom: 20px;">
+                <div class="form-group" style="margin-bottom:0">
+                    <label>初始资金</label>
+                    <input type="text" value="100,000 USDT">
+                </div>
+                <div class="form-group" style="margin-bottom:0">
+                    <label>杠杆</label>
+                    <input type="text" value="5×">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>入场价</label>
+                <input type="text" value="65,000 USDT">
+            </div>
+
+            <div class="form-group">
+                <label>网格范围</label>
+                <div class="form-row">
+                    <input type="text" value="58,500" style="text-align:center">
+                    <input type="text" value="71,500" style="text-align:center">
+                </div>
+            </div>
+
+            <div class="form-row three" style="margin-bottom: 24px;">
+                <div class="form-group" style="margin-bottom:0"><label>网格大小</label><input type="text" value="500"></div>
+                <div class="form-group" style="margin-bottom:0"><label>网格雷数</label><input type="text" value="26"></div>
+                <div class="form-group" style="margin-bottom:0"><label>单次购买</label><input type="text" value="0.05 BTC"></div>
+            </div>
+
+            <button class="btn-glow">▶ 开始测算</button>
+        </div>
+
+        <!-- RESULT -->
+        <div class="glass">
+            <div class="result-header" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:24px;">
+                <div style="font-size:20px; font-weight:700;">₿ BTCUSDT</div>
+                <div style="font-size:12px; color:var(--dim); background:rgba(255,255,255,0.05); padding:6px 12px; border-radius:100px; border:1px solid var(--border);">全仓 · 5×</div>
+            </div>
+
+            <div class="safety-badge safe">
+                <div class="safety-icon" style="font-size:32px;">✓</div>
+                <div class="safety-value">0.00</div>
+                <div class="safety-sub">无爆仓风险 · 保证金仅占用 16.9%</div>
+            </div>
+
+            <div class="metrics">
+                <div class="metric"><div class="v green">26</div><div class="l">网格数</div></div>
+                <div class="metric"><div class="v purple">5.00</div><div class="l">单格利润 USDT</div></div>
+                <div class="metric"><div class="v purple">16,900</div><div class="l">总占用</div></div>
+                <div class="metric"><div class="v green">50%</div><div class="l">最大回撤</div></div>
+            </div>
+
+            <div class="visual-bar">
+                <div class="filled" style="width:16.9%"></div>
+            </div>
+            <div class="bar-labels"><span>占用 16,900</span><span>总资金 100,000 USDT</span></div>
+
+            <div class="suggestion" style="margin-top:24px;">
+                <span class="icon">✓</span>
+                <span>当前参数安全，可以执行。保证金占用率适中 <span style="color:var(--dim)">· 剩余 83,100 USDT 保持流动性</span></span>
+            </div>
+
+            <a href="ui-defi.html" class="back-btn">← 重新测算</a>
+            <a href="ui-defi-danger.html" class="back-btn" style="margin-left:10px;">危险场景 →</a>
+        </div>
+    </div>
+</body>
+</html>

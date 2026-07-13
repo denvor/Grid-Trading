@@ -1,0 +1,301 @@
+"""回测路由。"""
+import json
+from decimal import Decimal, InvalidOperation
+from datetime import datetime, timezone
+
+from flask import render_template, request, jsonify, stream_with_context, Response
+
+from app.backtest import backtest_bp
+from app.backtest.database import list_symbol_intervals, get_interval_summary
+from app.backtest.data_fetcher import get_stored_klines
+from app.backtest.data_fetcher import SUPPORTED_INTERVALS
+
+
+def _parse_and_validate(form: dict):
+    """解析并校验回测表单参数。"""
+    errors = []
+    required_fields = [
+        "symbol", "interval", "capital", "upper_price", "lower_price",
+        "grid_size", "quantity_per_grid", "start_time", "end_time",
+    ]
+    for field in required_fields:
+        if not form.get(field, "").strip():
+            errors.append(f"字段 {field} 为必填项")
+    if errors:
+        return {}, errors
+
+    try:
+        # 清理千分位逗号（支持 "100,000" 格式输入）
+        def _clean_number(raw: str) -> str:
+            return raw.strip().replace(",", "")
+        params = {
+            "symbol": form["symbol"],
+            "interval": form["interval"],
+            "capital": Decimal(_clean_number(form["capital"])),
+            "upper_price": Decimal(_clean_number(form["upper_price"])),
+            "lower_price": Decimal(_clean_number(form["lower_price"])),
+            "grid_size": Decimal(_clean_number(form["grid_size"])),
+            "quantity_per_grid": Decimal(_clean_number(form["quantity_per_grid"])),
+            "start_time": form["start_time"],
+            "end_time": form["end_time"],
+        }
+    except (InvalidOperation, ValueError):
+        return {}, ["请输入有效的数值"]
+
+    if params["upper_price"] <= params["lower_price"]:
+        errors.append("网格上限必须大于下限")
+    if params["start_time"] >= params["end_time"]:
+        errors.append("开始时间必须早于结束时间")
+
+    # 时间跨度警告（>2 年提示计算可能较慢）
+    try:
+        _start = datetime.strptime(params["start_time"], "%Y-%m-%d")
+        _end = datetime.strptime(params["end_time"], "%Y-%m-%d")
+        if (_end - _start).days > 730:
+            params["time_span_warning"] = True
+    except ValueError:
+        pass
+    if params["grid_size"] <= Decimal("0"):
+        errors.append("网格大小必须为正数")
+    if params["quantity_per_grid"] <= Decimal("0"):
+        errors.append("单次购买数量必须为正数")
+    if params["capital"] <= Decimal("0"):
+        errors.append("初始资金必须为正数")
+
+    return params, errors
+
+
+def _date_to_ms(date_str: str) -> int:
+    """'YYYY-MM-DD' 转为毫秒时间戳。"""
+    dt = datetime.strptime(date_str, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+    return int(dt.timestamp() * 1000)
+
+
+# 按从短到长顺序排列，避免 set 迭代顺序漂移
+ALL_INTERVALS = sorted(SUPPORTED_INTERVALS, key=lambda s: {"m": 1, "h": 60}[s[-1]] * int(s[:-1]))
+
+
+@backtest_bp.route("/backtest/available_data")
+def available_data():
+    """返回某交易对可用的 interval 及其时间范围（供前端联动）。"""
+    symbol = request.args.get("symbol", "")
+    if not symbol:
+        return jsonify({"intervals": {}})
+
+    db_intervals = list_symbol_intervals(None, symbol)
+    interval_map = {iv["interval"]: iv for iv in db_intervals}
+
+    result = {}
+    for iv in ALL_INTERVALS:
+        if iv in interval_map:
+            d = interval_map[iv]
+            # 查询该 interval 的价格上下限
+            price_info = get_interval_summary(None, symbol, iv, d["min_ts"], d["max_ts"])
+            result[iv] = {
+                "count": d["count"],
+                "min_ts": d["min_ts"],
+                "max_ts": d["max_ts"],
+                "low_price": price_info["low_min"] if price_info else None,
+                "high_price": price_info["high_max"] if price_info else None,
+            }
+        else:
+            result[iv] = {"count": 0, "min_ts": None, "max_ts": None,
+                         "low_price": None, "high_price": None}
+    return jsonify({"intervals": result})
+
+
+def _parse_stream_query(args: dict):
+    """从 GET query string 解析回测参数，返回 (params, errors)。"""
+    errors = []
+    for key in ["symbol", "interval", "capital", "upper_price", "lower_price",
+                "grid_size", "quantity_per_grid", "start_time", "end_time"]:
+        if not args.get(key, "").strip():
+            errors.append(f"缺少必填参数 {key}")
+    if errors:
+        return {}, errors
+
+    def _clean_number(raw: str) -> str:
+        return raw.strip().replace(",", "")
+    try:
+        params = {
+            "symbol": args["symbol"].upper().strip(),
+            "interval": args["interval"],
+            "capital": Decimal(_clean_number(args["capital"])),
+            "upper_price": Decimal(_clean_number(args["upper_price"])),
+            "lower_price": Decimal(_clean_number(args["lower_price"])),
+            "grid_size": Decimal(_clean_number(args["grid_size"])),
+            "quantity_per_grid": Decimal(_clean_number(args["quantity_per_grid"])),
+            "start_time": args["start_time"],
+            "end_time": args["end_time"],
+        }
+    except (InvalidOperation, ValueError):
+        return {}, ["请输入有效的数值"]
+
+    if params["upper_price"] <= params["lower_price"]:
+        errors.append("网格上限必须大于下限")
+    if params["start_time"] >= params["end_time"]:
+        errors.append("开始时间必须早于结束时间")
+    try:
+        _start = datetime.strptime(params["start_time"], "%Y-%m-%d")
+        _end = datetime.strptime(params["end_time"], "%Y-%m-%d")
+        if (_end - _start).days > 730:
+            params["time_span_warning"] = True
+    except ValueError:
+        pass
+    if params["grid_size"] <= Decimal("0"):
+        errors.append("网格大小必须为正数")
+    if params["quantity_per_grid"] <= Decimal("0"):
+        errors.append("单次购买数量必须为正数")
+    if params["capital"] <= Decimal("0"):
+        errors.append("初始资金必须为正数")
+
+    return params, errors
+
+
+def _render_backtest_index(errors=None, form=None, symbols=None,
+                          time_span_warning=None):
+    """渲染回测入口页（错误/空表单共用模板）。"""
+    return render_template("backtest/index.html", errors=errors,
+                           form=form, symbols=symbols, all_intervals=ALL_INTERVALS,
+                           time_span_warning=time_span_warning)
+
+
+@backtest_bp.route("/backtest", methods=["GET", "POST"])
+def backtest_index():
+    # 延迟导入避免循环导入
+    from app.backtest.data_fetcher import get_stored_klines
+    from app.backtest.engine import backtest
+    from app.config_loader import get_symbols
+
+    symbols = get_symbols()
+    if request.method == "POST":
+        params, errors = _parse_and_validate(request.form)
+        tw = params.get("time_span_warning")
+        if errors:
+            return _render_backtest_index(errors=errors, form=request.form,
+                                         symbols=symbols, time_span_warning=tw)
+
+        try:
+            start_ts = _date_to_ms(params["start_time"])
+            end_ts = _date_to_ms(params["end_time"])
+        except ValueError:
+            return _render_backtest_index(
+                errors=["日期格式无效，请使用 YYYY-MM-DD"], form=request.form,
+                symbols=symbols, time_span_warning=tw)
+
+        # 从数据库获取K线
+        klines = get_stored_klines(params["symbol"], params["interval"], start_ts, end_ts)
+        if not klines:
+            errors = [f"数据库中没有 {params['symbol']} {params['interval']} 的数据。"
+                      f"请先运行 CLI 拉取：python fetch_data.py --symbol {params['symbol']} "
+                      f"--interval {params['interval']} --start {params['start_time']} "
+                      f"--end {params['end_time']}"]
+            return _render_backtest_index(errors=errors, form=request.form,
+                                         symbols=symbols, time_span_warning=tw)
+
+        # 执行回测
+        result = backtest(
+            klines=klines,
+            capital=params["capital"],
+            upper_price=params["upper_price"],
+            lower_price=params["lower_price"],
+            grid_size=params["grid_size"],
+            quantity_per_grid=params["quantity_per_grid"],
+        )
+        return render_template("backtest/result.html", result=result,
+                               params=params, symbols=symbols,
+                               time_span_warning=tw)
+
+    return _render_backtest_index(symbols=symbols)
+
+
+@backtest_bp.route("/backtest/stream")
+def stream_backtest():
+    """SSE 流式回测进度。GET 参数同 POST /backtest 表单。"""
+    from app.backtest.engine import backtest
+
+    params, errors = _parse_stream_query(request.args.to_dict())
+    if errors:
+        return jsonify({"error": errors[0]}), 400
+
+    try:
+        start_ts = _date_to_ms(params["start_time"])
+        end_ts = _date_to_ms(params["end_time"])
+    except ValueError:
+        return jsonify({"error": "日期格式无效，请使用 YYYY-MM-DD"}), 400
+
+    # 从数据库获取K线
+    klines = get_stored_klines(params["symbol"], params["interval"], start_ts, end_ts)
+    if not klines:
+        return jsonify({"error": f"数据库中没有 {params['symbol']} {params['interval']} 的数据。"
+                               f"请先运行 CLI 拉取：python fetch_data.py --symbol {params['symbol']} "
+                               f"--interval {params['interval']} --start {params['start_time']} "
+                               f"--end {params['end_time']}"}), 400
+
+    total_klines = len(klines)
+
+    def _progress_callback(percent, kline_index, total, elapsed_ms, trades_count):
+        """把进度推给浏览器。"""
+        eta_ms = int((elapsed_ms / max(percent, 1)) * (100 - percent)) if percent > 0 else 0
+        payload = json.dumps({
+            "percent": percent,
+            "kline_index": kline_index,
+            "total_klines": total,
+            "elapsed_ms": elapsed_ms,
+            "eta_ms": eta_ms,
+            "trades_count": trades_count,
+        })
+        yield f"event: progress\ndata: {payload}\n\n"
+
+    def _generate():
+        """Generator: 每秒推 progress，最终推 done/error。"""
+        yield f"retry: 5000\n\n"
+        # 把 progress_callback 队列化（callback → list → pop）
+        progress_queue = []
+        def cb(percent, kline_index, total, elapsed_ms, trades_count):
+            progress_queue.append((percent, kline_index, total, elapsed_ms, trades_count))
+
+        try:
+            # 跑回测（与 POST /backtest 共用逻辑）
+            result = backtest(
+                klines=klines,
+                capital=params["capital"],
+                upper_price=params["upper_price"],
+                lower_price=params["lower_price"],
+                grid_size=params["grid_size"],
+                quantity_per_grid=params["quantity_per_grid"],
+                progress_callback=cb,
+            )
+            # 把积压的 progress 全部排出
+            while progress_queue:
+                p = progress_queue.pop(0)
+                eta_ms = 0
+                if p[0] > 0:
+                    eta_ms = int((p[3] / p[0]) * (100 - p[0]))
+                payload = json.dumps({
+                    "percent": p[0],
+                    "kline_index": p[1],
+                    "total_klines": p[2],
+                    "elapsed_ms": p[3],
+                    "eta_ms": eta_ms,
+                    "trades_count": p[4],
+                })
+                yield f"event: progress\ndata: {payload}\n\n"
+            # 最终 done 事件（Decimal → str 以便 JSON 序列化）
+            def _decimal_to_str(obj):
+                if isinstance(obj, Decimal):
+                    return str(obj)
+                raise TypeError
+            payload = json.dumps({"result": result, "elapsed_ms": result["elapsed_ms"]},
+                                 default=_decimal_to_str)
+            yield f"event: done\ndata: {payload}\n\n"
+        except Exception as e:
+            payload = json.dumps({"error": str(e)})
+            yield f"event: error\ndata: {payload}\n\n"
+
+    return Response(stream_with_context(_generate()),
+                    mimetype="text/event-stream",
+                    headers={
+                        "Cache-Control": "no-cache",
+                        "X-Accel-Buffering": "no",
+                    })

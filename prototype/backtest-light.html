@@ -1,0 +1,334 @@
+<!DOCTYPE html><html lang="zh-CN" data-bs-theme="light"><head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>回测 — 网格交易测算</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;700;900&amp;family=Satoshi:wght@400;700&amp;display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="http://192.168.199.171:5000/static/vendor/bootstrap.min.css">
+    <link rel="stylesheet" href="http://192.168.199.171:5000/static/style.css">
+</head>
+<body class="light">
+<script>
+// FOUC 防护：在 body 标签后立刻执行（此时 DOM 已解析到 body，CSS 尚未 paint）
+(function() {
+    try {
+        var t = localStorage.getItem('theme') || 'light';
+        if (t === 'system') {
+            t = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+        }
+        document.documentElement.setAttribute('data-bs-theme', t);
+        document.body.className = (t === 'dark') ? 'bk' : 'light';
+    } catch (e) {}
+})();
+</script>
+<div class="container py-3">
+    <!-- 品牌 -->
+    <div class="brand">
+        <div class="brand-logo">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M3 3h18v18H3zM3 9h18M3 15h18M9 3v18M15 3v18"></path></svg>
+        </div>
+        <div class="brand-name">grid<span>·</span>calc</div>
+    </div>
+
+    <!-- 导航栏 -->
+    <div class="d-flex align-items-center justify-content-between mb-3">
+        <nav class="nav nav-pills mb-0">
+            <a class="nav-link " href="/">资金计算</a>
+            <a class="nav-link active" href="/backtest">回测</a>
+            <a class="nav-link " href="/data">数据展示</a>
+        </nav>
+        <!-- 主题切换 -->
+        <div class="btn-group btn-group-sm theme-toggle" role="group" aria-label="主题切换">
+            <button type="button" class="btn btn-outline-secondary active" data-theme="light" id="theme-light">亮</button>
+            <button type="button" class="btn btn-outline-secondary" data-theme="dark" id="theme-dark">暗</button>
+            <button type="button" class="btn btn-outline-secondary" data-theme="system" id="theme-system">跟随</button>
+        </div>
+    </div>
+
+    
+<form method="POST" action="/backtest" class="glass">
+    
+
+    
+
+    <div class="row g-3 mb-3">
+        <div class="col-md-6">
+            <label class="form-label">币种</label>
+            <select class="form-select" name="symbol" id="symbol" required="">
+                
+                <option value="BTCUSDT" data-entry="65000" data-upper-pct="10" data-lower-pct="10" data-grid-size="500" data-quantity="0.01">
+                    BTCUSDT (Bitcoin)
+                </option>
+                
+                <option value="ETHUSDT" data-entry="3500" data-upper-pct="12" data-lower-pct="12" data-grid-size="30" data-quantity="0.1">
+                    ETHUSDT (Ethereum)
+                </option>
+                
+                <option value="BNBUSDT" data-entry="600" data-upper-pct="15" data-lower-pct="15" data-grid-size="10" data-quantity="0.5">
+                    BNBUSDT (BNB)
+                </option>
+                
+            </select>
+        </div>
+        <div class="col-md-6">
+            <label class="form-label">K线周期</label>
+            <div class="dropdown" id="interval-wrapper">
+                <button class="btn btn-outline-light dropdown-toggle text-start w-100" type="button" id="interval-dropdown-btn" data-bs-toggle="dropdown" aria-expanded="false">
+                    <span id="interval-display">1h</span>
+                </button>
+                <ul class="dropdown-menu dropdown-menu-dark w-100" id="interval-menu">
+                    
+                    <li><a class="dropdown-item disabled" href="#" data-value="1m">1m</a></li>
+                    
+                    <li><a class="dropdown-item disabled" href="#" data-value="5m">5m</a></li>
+                    
+                    <li><a class="dropdown-item disabled" href="#" data-value="15m">15m</a></li>
+                    
+                    <li><a class="dropdown-item active" href="#" data-value="1h">1h</a></li>
+                    
+                    <li><a class="dropdown-item disabled" href="#" data-value="4h">4h</a></li>
+                    
+                </ul>
+            </div>
+            <input type="hidden" name="interval" id="interval" value="1h">
+        </div>
+    </div>
+
+    <div class="row g-3 mb-3">
+        <div class="col-md-6">
+            <label class="form-label">初始资金 (USDT)</label>
+            <input type="number" step="0.01" class="form-control" name="capital" id="capital" min="0" required="" value="10000">
+        </div>
+        <div class="col-md-6">
+            <label class="form-label">单次购买数量 (币)</label>
+            <input type="number" step="any" class="form-control" name="quantity_per_grid" id="quantity_per_grid" min="0" required="" value="0.01">
+        </div>
+    </div>
+
+    <div class="row g-3 mb-3">
+        <div class="col-md-4">
+            <label class="form-label">网格下限 (USDT)</label>
+            <input type="number" step="0.01" class="form-control" name="lower_price" id="lower_price" required="" value="">
+        </div>
+        <div class="col-md-4">
+            <label class="form-label">网格上限 (USDT)</label>
+            <input type="number" step="0.01" class="form-control" name="upper_price" id="upper_price" required="" value="">
+        </div>
+        <div class="col-md-4">
+            <label class="form-label">网格间距 (USDT)</label>
+            <input type="number" step="0.01" class="form-control" name="grid_size" id="grid_size" required="" value="">
+        </div>
+    </div>
+
+    <div class="row g-3 mb-3">
+        <div class="col-md-6">
+            <label class="form-label">开始时间</label>
+            <input type="date" class="form-control" name="start_time" id="start_time" required="" value="" min="2023-01-01" max="2026-07-01">
+        </div>
+        <div class="col-md-6">
+            <label class="form-label">结束时间</label>
+            <input type="date" class="form-control" name="end_time" id="end_time" required="" value="" min="2023-01-01" max="2026-07-01">
+        <div id="date-hint" class="date-hint">可回测范围: 2023-01-01 ~ 2026-07-01</div></div>
+    </div>
+
+    <button type="submit" class="btn-glow">▶ 开始回测</button>
+    <p class="mt-3 small text-muted">
+        💡 提示：首次回测前请先运行 CLI 拉取数据 —
+        <code class="bg-dark px-1 py-0.5 rounded">
+            python fetch_data.py --symbol BTCUSDT --interval 1h --start 2024-01-01 --end 2024-03-01
+        </code>
+    </p>
+</form>
+
+<script>
+const symbolSelect = document.getElementById('symbol');
+const intervalHidden = document.getElementById('interval');
+const dropdownBtn = document.getElementById('interval-dropdown-btn');
+const intervalDisplay = document.getElementById('interval-display');
+const intervalMenu = document.getElementById('interval-menu');
+const startDateInput = document.getElementById('start_time');
+const endDateInput = document.getElementById('end_time');
+
+// 缓存 symbol 切换时拉到的 interval 数据
+let cachedIntervals = null;
+
+// Bootstrap dropdown 点击事件
+intervalMenu.querySelectorAll('.dropdown-item').forEach(item => {
+    item.addEventListener('click', function (e) {
+        e.preventDefault();
+        if (this.classList.contains('disabled')) return;
+        const value = this.dataset.value;
+        intervalDisplay.textContent = value;
+        intervalHidden.value = value;
+        // 更新选中样式
+        intervalMenu.querySelectorAll('.dropdown-item').forEach(i => i.classList.remove('active'));
+        this.classList.add('active');
+        // 触发联动
+        updateDateConstraints(cachedIntervals || {});
+        fillGridBoundsFromData(cachedIntervals || {});
+    });
+});
+
+function getIntervalValue() { return intervalHidden.value; }
+
+// 自动填网格参数
+function fillBacktestDefaults() {
+    const opt = symbolSelect.options[symbolSelect.selectedIndex];
+    if (!opt.dataset.entry) return;
+    const entry = parseFloat(opt.dataset.entry);
+    const upperPct = parseFloat(opt.dataset.upperPct);
+    const lowerPct = parseFloat(opt.dataset.lowerPct);
+    if (isNaN(entry) || isNaN(upperPct) || isNaN(lowerPct)) return;
+    const upperInput = document.getElementById('upper_price');
+    const lowerInput = document.getElementById('lower_price');
+    const gridSizeInput = document.getElementById('grid_size');
+    const qtyInput = document.getElementById('quantity_per_grid');
+    if (upperInput && !upperInput.value)
+        upperInput.value = (entry * (1 + upperPct / 100)).toFixed(2);
+    if (lowerInput && !lowerInput.value)
+        lowerInput.value = (entry * (1 - lowerPct / 100)).toFixed(2);
+    if (gridSizeInput && !gridSizeInput.value)
+        gridSizeInput.value = opt.dataset.gridSize;
+    if (qtyInput && !qtyInput.value)
+        qtyInput.value = opt.dataset.quantity;
+}
+
+function fillGridBoundsFromData(intervals) {
+    const val = getIntervalValue();
+    const info = intervals[val];
+    if (!info || !info.low_price || !info.high_price) return;
+    const upperInput = document.getElementById('upper_price');
+    const lowerInput = document.getElementById('lower_price');
+    if (upperInput) upperInput.value = parseFloat(info.high_price).toFixed(2);
+    if (lowerInput) lowerInput.value = parseFloat(info.low_price).toFixed(2);
+}
+
+function updateAvailableData() {
+    const symbol = symbolSelect.value;
+    if (!symbol) return;
+    fetch(`http://192.168.199.171:5000/backtest/available_data?symbol=${encodeURIComponent(symbol)}`)
+        .then(r => r.json())
+        .then(data => {
+            const intervals = data.intervals || {};
+            cachedIntervals = intervals;
+            // 更新下拉菜单：标记可用/不可用，自动选中第一个
+            let firstAvailable = null;
+            intervalMenu.querySelectorAll('.dropdown-item').forEach(item => {
+                const info = intervals[item.dataset.value];
+                if (info && info.count > 0) {
+                    item.classList.remove('disabled');
+                    if (!firstAvailable) firstAvailable = item.dataset.value;
+                } else {
+                    item.classList.add('disabled');
+                }
+            });
+            if (firstAvailable) {
+                intervalHidden.value = firstAvailable;
+                intervalDisplay.textContent = firstAvailable;
+                intervalMenu.querySelectorAll('.dropdown-item').forEach(i => i.classList.remove('active'));
+                const sel = intervalMenu.querySelector(`a[data-value="${firstAvailable}"]`);
+                if (sel) sel.classList.add('active');
+            }
+            updateDateConstraints(intervals);
+            fillGridBoundsFromData(intervals);
+        })
+        .catch(() => {});
+}
+
+function updateDateConstraints(intervals) {
+    const val = getIntervalValue();
+    const info = intervals[val];
+    if (info && info.min_ts && info.max_ts) {
+        const minDate = tsToDate(info.min_ts);
+        const maxDate = tsToDate(info.max_ts);
+        startDateInput.min = minDate;
+        startDateInput.max = maxDate;
+        endDateInput.min = minDate;
+        endDateInput.max = maxDate;
+        if (!startDateInput.value) startDateInput.value = minDate;
+        if (!endDateInput.value) endDateInput.value = maxDate;
+        let hint = document.getElementById('date-hint');
+        if (!hint) {
+            hint = document.createElement('div');
+            hint.id = 'date-hint';
+            hint.className = 'date-hint';
+            endDateInput.parentNode.appendChild(hint);
+        }
+        hint.textContent = `可回测范围: ${minDate} ~ ${maxDate}`;
+    }
+}
+
+function tsToDate(ms) { return new Date(ms).toISOString().slice(0, 10); }
+
+symbolSelect.addEventListener('change', function() {
+    fillBacktestDefaults();
+    updateAvailableData();
+});
+
+window.addEventListener('DOMContentLoaded', function() {
+    if (symbolSelect.value) {
+        fillBacktestDefaults();
+        updateAvailableData();
+    }
+});
+</script>
+
+
+    <footer class="footer">
+        <p class="disclaimer">⚠️ 本工具使用简化模型测算，未计入资金费率、手续费、维持保证金。结果仅供参考。</p>
+    </footer>
+</div>
+
+<script src="http://192.168.199.171:5000/static/vendor/bootstrap.bundle.min.js"></script>
+<script>
+// 主题切换：dark → light → system → dark
+(function() {
+    var cycle = ['dark', 'light', 'system'];
+    var buttons = {
+        dark: document.getElementById('theme-dark'),
+        light: document.getElementById('theme-light'),
+        system: document.getElementById('theme-system')
+    };
+
+    function applyTheme(state) {
+        var resolved = state;
+        if (state === 'system') {
+            resolved = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+        }
+        document.documentElement.setAttribute('data-bs-theme', resolved);
+        document.body.className = (resolved === 'dark') ? 'bk' : 'light';
+        localStorage.setItem('theme', state);
+        // 更新按钮高亮
+        ['dark', 'light', 'system'].forEach(function(s) {
+            if (buttons[s]) buttons[s].classList.toggle('active', s === state);
+        });
+    }
+
+    // 初始化当前按钮高亮
+    var current = localStorage.getItem('theme') || 'light';
+    if (buttons[current]) buttons[current].classList.add('active');
+
+    // 点击即设成该主题
+    ['dark', 'light', 'system'].forEach(function(s) {
+        if (!buttons[s]) return;
+        buttons[s].addEventListener('click', function() {
+            applyTheme(s);
+        });
+    });
+
+    // 监听系统主题变更（仅在 system 模式下生效）
+    if (window.matchMedia) {
+        try {
+            window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', function(e) {
+                var saved = localStorage.getItem('theme') || 'dark';
+                if (saved !== 'system') return;
+                var resolved = e.matches ? 'light' : 'dark';
+                document.documentElement.setAttribute('data-bs-theme', resolved);
+                document.body.className = (resolved === 'dark') ? 'bk' : 'light';
+            });
+        } catch (e) {}
+    }
+})();
+</script>
+
+
+</body></html>

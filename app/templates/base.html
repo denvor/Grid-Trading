@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-bs-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}网格交易测算工具{% endblock %}</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;700;900&family=Satoshi:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='vendor/bootstrap.min.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body class="light">
+<script>
+// FOUC 防护：在 body 标签后立刻执行（此时 DOM 已解析到 body，CSS 尚未 paint）
+(function() {
+    try {
+        var t = localStorage.getItem('theme') || 'light';
+        if (t === 'system') {
+            t = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+        }
+        document.documentElement.setAttribute('data-bs-theme', t);
+        document.body.className = (t === 'dark') ? 'bk' : 'light';
+    } catch (e) {}
+})();
+</script>
+<div class="container py-3">
+    <!-- 品牌 -->
+    <div class="brand">
+        <div class="brand-logo">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M3 3h18v18H3zM3 9h18M3 15h18M9 3v18M15 3v18"/></svg>
+        </div>
+        <div class="brand-name">grid<span>·</span>calc</div>
+    </div>
+
+    <!-- 导航栏 -->
+    <div class="d-flex align-items-center justify-content-between mb-3">
+        <nav class="nav nav-pills mb-0">
+            <a class="nav-link {% if request.endpoint == 'main.index' %}active{% endif %}"
+               href="{{ url_for('main.index') }}">资金计算</a>
+            <a class="nav-link {% if request.endpoint == 'backtest.backtest_index' %}active{% endif %}"
+               href="{{ url_for('backtest.backtest_index') }}">回测</a>
+            <a class="nav-link {% if request.endpoint == 'backtest.data_index' %}active{% endif %}"
+               href="{{ url_for('backtest.data_index') }}">数据展示</a>
+        </nav>
+        <!-- 主题切换 -->
+        <div class="btn-group btn-group-sm theme-toggle" role="group" aria-label="主题切换">
+            <button type="button" class="btn btn-outline-secondary" data-theme="light" id="theme-light">亮</button>
+            <button type="button" class="btn btn-outline-secondary" data-theme="dark" id="theme-dark">暗</button>
+            <button type="button" class="btn btn-outline-secondary" data-theme="system" id="theme-system">跟随</button>
+        </div>
+    </div>
+
+    {% block content %}{% endblock %}
+
+    <footer class="footer">
+        <p class="disclaimer">⚠️ 本工具使用简化模型测算，未计入资金费率、手续费、维持保证金。结果仅供参考。</p>
+    </footer>
+</div>
+
+<script src="{{ url_for('static', filename='vendor/bootstrap.bundle.min.js') }}"></script>
+<script>
+// 主题切换：dark → light → system → dark
+(function() {
+    var cycle = ['dark', 'light', 'system'];
+    var buttons = {
+        dark: document.getElementById('theme-dark'),
+        light: document.getElementById('theme-light'),
+        system: document.getElementById('theme-system')
+    };
+
+    function applyTheme(state) {
+        var resolved = state;
+        if (state === 'system') {
+            resolved = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+        }
+        document.documentElement.setAttribute('data-bs-theme', resolved);
+        document.body.className = (resolved === 'dark') ? 'bk' : 'light';
+        localStorage.setItem('theme', state);
+        // 更新按钮高亮
+        ['dark', 'light', 'system'].forEach(function(s) {
+            if (buttons[s]) buttons[s].classList.toggle('active', s === state);
+        });
+    }
+
+    // 初始化当前按钮高亮
+    var current = localStorage.getItem('theme') || 'light';
+    if (buttons[current]) buttons[current].classList.add('active');
+
+    // 点击即设成该主题
+    ['dark', 'light', 'system'].forEach(function(s) {
+        if (!buttons[s]) return;
+        buttons[s].addEventListener('click', function() {
+            applyTheme(s);
+        });
+    });
+
+    // 监听系统主题变更（仅在 system 模式下生效）
+    if (window.matchMedia) {
+        try {
+            window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', function(e) {
+                var saved = localStorage.getItem('theme') || 'dark';
+                if (saved !== 'system') return;
+                var resolved = e.matches ? 'light' : 'dark';
+                document.documentElement.setAttribute('data-bs-theme', resolved);
+                document.body.className = (resolved === 'dark') ? 'bk' : 'light';
+            });
+        } catch (e) {}
+    }
+})();
+</script>
+{% block scripts %}{% endblock %}
+</body>
+</html>
