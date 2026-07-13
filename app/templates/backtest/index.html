@@ -53,12 +53,12 @@
         <div class="col-md-6">
             <label class="form-label">初始资金 (USDT)</label>
             <input type="number" step="0.01" class="form-control" name="capital" id="capital" min="0" required
-                   value="{{ form.capital if form else '10000' }}">
+                   value="{{ form.capital|default('10000', true) }}">
         </div>
         <div class="col-md-6">
             <label class="form-label">单次购买数量 (币)</label>
             <input type="number" step="any" class="form-control" name="quantity_per_grid" id="quantity_per_grid" min="0" required
-                   value="{{ form.quantity_per_grid if form else '0.01' }}">
+                   value="{{ form.quantity_per_grid|default('0.01', true) }}">
         </div>
     </div>
 

@@ -1,9 +1,11 @@
 """Flask 路由：参数表单 + 测算结果。"""
+import configparser
+import os
 from decimal import Decimal, InvalidOperation
-from flask import Blueprint, render_template, request
+from flask import Blueprint, render_template, request, jsonify
 
 from app.calculator import analyze
-from app.config_loader import get_symbols
+from app.config_loader import get_symbols, save_symbol
 
 main_bp = Blueprint("main", __name__)
 
@@ -101,13 +103,39 @@ def index():
         upper_pct = Decimal(s["upper_pct"])
         lower_pct = Decimal(s["lower_pct"])
         form = {
-            "symbol": s["symbol"], "capital": s["capital"], "leverage": "1",
+            "symbol": s["symbol"], "capital": s["capital"],
+            "leverage": s.get("leverage", "1"),
             "entry_price": s["entry_price"],
             "upper_price": f"{entry * (1 + upper_pct / 100):.2f}",
             "lower_price": f"{entry * (1 - lower_pct / 100):.2f}",
             "grid_size": s["grid_size"],
             "quantity_per_grid": s["quantity_per_grid"],
-            "margin_mode": "cross",
+            "margin_mode": s.get("margin_mode", "cross"),
         }
 
     return render_template("index.html", errors=None, form=form, symbols=symbols)
+
+
+@main_bp.route("/save", methods=["POST"])
+def save_config():
+    """保存币种参数到 config.ini。"""
+    try:
+        symbol = request.form.get("symbol", "").upper().strip()
+        if not symbol:
+            return jsonify({"error": "缺少 symbol"}), 400
+        save_symbol(
+            symbol=symbol,
+            capital=request.form.get("capital", "1000"),
+            leverage=request.form.get("leverage", "1"),
+            upper_price=request.form.get("upper_price", "0"),
+            lower_price=request.form.get("lower_price", "0"),
+            grid_size=request.form.get("grid_size", "0"),
+            quantity_per_grid=request.form.get("quantity_per_grid", "0"),
+            margin_mode=request.form.get("margin_mode", "cross"),
+        )
+        # 让 config_loader 重新加载
+        from app.config_loader import _config as _cfg, CONFIG_PATH as _cfg_path
+        _cfg.read(_cfg_path, encoding="utf-8")
+        return jsonify({"ok": True})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400

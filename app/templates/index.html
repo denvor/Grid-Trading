@@ -90,7 +90,11 @@
         </div>
     </div>
 
-    <button type="submit" class="btn-glow">▶ 开始测算</button>
+    <div class="d-flex gap-2">
+        <button type="submit" class="btn-glow">▶ 开始测算</button>
+        <button type="button" class="btn btn-outline-light" id="btn-save" onclick="saveConfig()">💾 保存参数</button>
+    </div>
+    <div id="save-toast" class="alert alert-success mt-2" style="display:none;">✓ 已保存到 config.ini</div>
 </form>
 
 <script>
@@ -135,6 +139,34 @@ document.getElementById('symbol').addEventListener('change', fillDefaults);
 ['upper_price','lower_price','grid_size','quantity_per_grid','leverage','entry_price'].forEach(id => {
     document.getElementById(id).addEventListener('input', updatePreview);
 });
+
+// 保存参数到 config.ini
+function saveConfig() {
+    const form = document.querySelector('form');
+    const data = new FormData(form);
+    fetch('/save', { method: 'POST', body: data })
+        .then(r => r.json())
+        .then(j => {
+            const toast = document.getElementById('save-toast');
+            if (j.ok) {
+                toast.textContent = '✓ 已保存到 config.ini';
+                toast.className = 'alert alert-success mt-2';
+            } else {
+                toast.textContent = '✗ 保存失败：' + (j.error || '未知错误');
+                toast.className = 'alert alert-danger mt-2';
+            }
+            toast.style.display = 'block';
+            setTimeout(() => { toast.style.display = 'none'; }, 3000);
+        })
+        .catch(e => {
+            const toast = document.getElementById('save-toast');
+            toast.textContent = '✗ 网络错误：' + e;
+            toast.className = 'alert alert-danger mt-2';
+            toast.style.display = 'block';
+            setTimeout(() => { toast.style.display = 'none'; }, 3000);
+        });
+}
+
 window.addEventListener('DOMContentLoaded', function() {
     fillDefaults();
     updatePreview();

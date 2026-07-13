@@ -166,7 +166,7 @@ def backtest_index():
     # 延迟导入避免循环导入
     from app.backtest.data_fetcher import get_stored_klines
     from app.backtest.engine import backtest
-    from app.config_loader import get_symbols
+    from app.config_loader import get_symbols, get_symbol
 
     symbols = get_symbols()
     if request.method == "POST":
@@ -207,7 +207,18 @@ def backtest_index():
                                params=params, symbols=symbols,
                                time_span_warning=tw)
 
-    return _render_backtest_index(symbols=symbols)
+    # GET：读取 config.ini 的初始资本 / 购买数量作为表单默认值
+    form = None
+    if symbols:
+        s = symbols[0]
+        sym = get_symbol(s["symbol"])
+        if sym:
+            form = {
+                "capital": sym.get("capital", "1000"),
+                "quantity_per_grid": sym.get("quantity_per_grid", "0.01"),
+            }
+
+    return _render_backtest_index(symbols=symbols, form=form)
 
 
 # 内存 job store：jobid → {result, params, time_span_warning}
