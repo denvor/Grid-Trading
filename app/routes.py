@@ -99,15 +99,12 @@ def index():
         }
     elif symbols:
         s = symbols[0]
-        entry = Decimal(s["entry_price"])
-        upper_pct = Decimal(s["upper_pct"])
-        lower_pct = Decimal(s["lower_pct"])
         form = {
             "symbol": s["symbol"], "capital": s["capital"],
             "leverage": s.get("leverage", "1"),
             "entry_price": s["entry_price"],
-            "upper_price": f"{entry * (1 + upper_pct / 100):.2f}",
-            "lower_price": f"{entry * (1 - lower_pct / 100):.2f}",
+            "upper_price": s["upper_price"],
+            "lower_price": s["lower_price"],
             "grid_size": s["grid_size"],
             "quantity_per_grid": s["quantity_per_grid"],
             "margin_mode": s.get("margin_mode", "cross"),

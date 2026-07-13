@@ -19,8 +19,8 @@ def get_symbols() -> list[dict]:
             "symbol": section.upper(),
             "name": _config.get(section, "name"),
             "entry_price": _config.get(section, "entry_price"),
-            "upper_pct": _config.get(section, "upper_pct"),
-            "lower_pct": _config.get(section, "lower_pct"),
+            "upper_price": _config.get(section, "upper_price"),
+            "lower_price": _config.get(section, "lower_price"),
             "grid_size": _config.get(section, "grid_size"),
             "quantity_per_grid": _config.get(section, "quantity_per_grid"),
             "capital": _config.get(section, "capital"),
@@ -41,25 +41,16 @@ def get_symbol(symbol: str) -> dict | None:
 def save_symbol(symbol: str, capital: str, leverage: str, upper_price: str,
                 lower_price: str, grid_size: str, quantity_per_grid: str,
                 margin_mode: str) -> None:
-    """保存币种参数到 config.ini（保留 entry_price / upper_pct / lower_pct 等原始字段）。"""
+    """保存币种参数到 config.ini。"""
     section = symbol.upper()
     if not _config.has_section(section):
         return
-    # 仅更新用户可编辑字段
     _config.set(section, "capital", str(capital))
     _config.set(section, "grid_size", str(grid_size))
     _config.set(section, "quantity_per_grid", str(quantity_per_grid))
     _config.set(section, "leverage", str(leverage))
     _config.set(section, "margin_mode", str(margin_mode))
-    # 同步更新 upper_pct / lower_pct（基于 entry_price 反算）
-    entry = _config.get(section, "entry_price", fallback="0")
-    try:
-        entry_f = float(entry)
-        if entry_f > 0 and float(upper_price) > 0:
-            _config.set(section, "upper_pct", f"{(float(upper_price) / entry_f - 1) * 100:.4f}")
-        if entry_f > 0 and float(lower_price) > 0:
-            _config.set(section, "lower_pct", f"{(1 - float(lower_price) / entry_f) * 100:.4f}")
-    except (ValueError, ZeroDivisionError):
-        pass
+    _config.set(section, "upper_price", str(upper_price))
+    _config.set(section, "lower_price", str(lower_price))
     with open(CONFIG_PATH, "w", encoding="utf-8") as f:
         _config.write(f)

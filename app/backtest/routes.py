@@ -207,7 +207,7 @@ def backtest_index():
                                params=params, symbols=symbols,
                                time_span_warning=tw)
 
-    # GET：读取 config.ini 的初始资本 / 购买数量作为表单默认值
+    # GET：读取 config.ini 的初始参数（capital / quantity_per_grid / grid_size / upper_price / lower_price）
     form = None
     if symbols:
         s = symbols[0]
@@ -216,6 +216,9 @@ def backtest_index():
             form = {
                 "capital": sym.get("capital", "1000"),
                 "quantity_per_grid": sym.get("quantity_per_grid", "0.01"),
+                "grid_size": sym.get("grid_size", ""),
+                "upper_price": sym.get("upper_price", ""),
+                "lower_price": sym.get("lower_price", ""),
             }
 
     return _render_backtest_index(symbols=symbols, form=form)

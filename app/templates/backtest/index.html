@@ -23,8 +23,8 @@
                 <option value="{{ s.symbol }}"
                     {% if form and form.symbol == s.symbol %}selected{% endif %}
                     data-entry="{{ s.entry_price }}"
-                    data-upper-pct="{{ s.upper_pct }}"
-                    data-lower-pct="{{ s.lower_pct }}"
+                    data-upper="{{ s.upper_price }}"
+                    data-lower="{{ s.lower_price }}"
                     data-grid-size="{{ s.grid_size }}"
                     data-quantity="{{ s.quantity_per_grid }}">
                     {{ s.symbol }} ({{ s.name }})
@@ -66,17 +66,17 @@
         <div class="col-md-4">
             <label class="form-label">网格下限 (USDT)</label>
             <input type="number" step="0.01" class="form-control" name="lower_price" id="lower_price" required
-                   value="{{ form.lower_price if form else '' }}">
+                   value="{{ form.lower_price|default('', true) }}">
         </div>
         <div class="col-md-4">
             <label class="form-label">网格上限 (USDT)</label>
             <input type="number" step="0.01" class="form-control" name="upper_price" id="upper_price" required
-                   value="{{ form.upper_price if form else '' }}">
+                   value="{{ form.upper_price|default('', true) }}">
         </div>
         <div class="col-md-4">
             <label class="form-label">网格间距 (USDT)</label>
             <input type="number" step="0.01" class="form-control" name="grid_size" id="grid_size" required
-                   value="{{ form.grid_size if form else '' }}">
+                   value="{{ form.grid_size|default('', true) }}">
         </div>
     </div>
 
@@ -142,17 +142,15 @@ function fillBacktestDefaults() {
     const opt = symbolSelect.options[symbolSelect.selectedIndex];
     if (!opt.dataset.entry) return;
     const entry = parseFloat(opt.dataset.entry);
-    const upperPct = parseFloat(opt.dataset.upperPct);
-    const lowerPct = parseFloat(opt.dataset.lowerPct);
-    if (isNaN(entry) || isNaN(upperPct) || isNaN(lowerPct)) return;
+    if (isNaN(entry)) return;
     const upperInput = document.getElementById('upper_price');
     const lowerInput = document.getElementById('lower_price');
     const gridSizeInput = document.getElementById('grid_size');
     const qtyInput = document.getElementById('quantity_per_grid');
     if (upperInput && !upperInput.value)
-        upperInput.value = (entry * (1 + upperPct / 100)).toFixed(2);
+        upperInput.value = opt.dataset.upper;
     if (lowerInput && !lowerInput.value)
-        lowerInput.value = (entry * (1 - lowerPct / 100)).toFixed(2);
+        lowerInput.value = opt.dataset.lower;
     if (gridSizeInput && !gridSizeInput.value)
         gridSizeInput.value = opt.dataset.gridSize;
     if (qtyInput && !qtyInput.value)
