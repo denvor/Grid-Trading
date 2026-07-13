@@ -1,9 +1,10 @@
 """回测路由。"""
 import json
+import uuid
 from decimal import Decimal, InvalidOperation
 from datetime import datetime, timezone
 
-from flask import render_template, request, jsonify, stream_with_context, Response
+from flask import render_template, request, jsonify, stream_with_context, Response, redirect, url_for, session
 
 from app.backtest import backtest_bp
 from app.backtest.database import list_symbol_intervals, get_interval_summary
@@ -209,6 +210,29 @@ def backtest_index():
     return _render_backtest_index(symbols=symbols)
 
 
+# 内存 job store：jobid → {result, params, time_span_warning}
+_backtest_jobs = {}
+
+
+@backtest_bp.route("/backtest/result")
+def backtest_result_page():
+    """渲染完整回测结果页（从 job store 读取）。"""
+    jobid = request.args.get("jobid", "")
+    job = _backtest_jobs.get(jobid)
+    if not job:
+        return redirect(url_for("backtest.backtest_index"))
+    # 取出后立即清理（结果已消费）
+    _backtest_jobs.pop(jobid, None)
+    return render_template("backtest/result.html", result=job["result"],
+                           params=job["params"], symbols=_get_symbols(),
+                           time_span_warning=job.get("time_span_warning"))
+
+
+def _get_symbols():
+    from app.config_loader import get_symbols
+    return get_symbols()
+
+
 @backtest_bp.route("/backtest/stream")
 def stream_backtest():
     """SSE 流式回测进度。GET 参数同 POST /backtest 表单。"""
@@ -250,6 +274,9 @@ def stream_backtest():
             "trades_count": trades_count,
         })
 
+    # 预生成 jobid，worker 完成后把结果存入 job store
+    jobid = uuid.uuid4().hex
+
     def _worker():
         """后台线程跑回测，完成后 put sentinel。"""
         try:
@@ -262,7 +289,12 @@ def stream_backtest():
                 quantity_per_grid=params["quantity_per_grid"],
                 progress_callback=_progress_callback,
             )
-            q.put(("done", result))
+            _backtest_jobs[jobid] = {
+                "result": result,
+                "params": params,
+                "time_span_warning": params.get("time_span_warning"),
+            }
+            q.put(("done", jobid))
         except Exception as e:
             q.put(("error", str(e)))
         finally:
@@ -282,12 +314,8 @@ def stream_backtest():
                 # done / error 最终事件
                 kind, payload = item
                 if kind == "done":
-                    def _decimal_to_str(obj):
-                        if isinstance(obj, Decimal):
-                            return str(obj)
-                        raise TypeError
-                    data = json.dumps({"result": payload, "elapsed_ms": payload["elapsed_ms"]},
-                                      default=_decimal_to_str)
+                    # payload 是 jobid，result 存在 _backtest_jobs 中
+                    data = json.dumps({"jobid": payload})
                     yield f"event: done\ndata: {data}\n\n"
                 else:
                     data = json.dumps({"error": payload})

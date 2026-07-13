@@ -1,10 +1,6 @@
 {% extends "base.html" %}
 {% block title %}回测 — 网格交易测算{% endblock %}
 {% block content %}
-<!-- 进度终端 -->
-<div id="backtest-terminal" class="backtest-terminal" style="display:none;"></div>
-<!-- 行内结果容器 -->
-<div id="backtest-result-inline" style="display:none;"></div>
 
 <form id="backtest-form" method="POST" action="/backtest" class="glass" onsubmit="return startStreamBacktest()">
     {% if errors %}
@@ -105,6 +101,10 @@
         </code>
     </p>
 </form>
+
+<!-- 进度终端 + 结果容器（开始回测后显示）-->
+<div id="backtest-terminal" class="backtest-terminal" style="display:none; margin-top:18px;"></div>
+<div id="backtest-result-inline" style="display:none; margin-top:18px;"></div>
 
 <script>
 const symbolSelect = document.getElementById('symbol');
@@ -239,14 +239,13 @@ window.addEventListener('DOMContentLoaded', function() {
 });
 
 // ════════════════════════════════════════════
-//   SSE 流式回测 — 进度终端 + 行内 result
+//   SSE 流式回测 — 进度终端 → 完成后重定向到 result 页
 // ════════════════════════════════════════════
 function startStreamBacktest() {
-    const params = new URLSearchParams(new FormData(document.getElementById('backtest-form')));
-    // 期间禁止用户重复点提交
+    const form = document.getElementById('backtest-form');
+    const params = new URLSearchParams(new FormData(form));
     document.getElementById('backtest-submit-btn').disabled = true;
 
-    // 显示终端、隐藏 form
     const term = document.getElementById('backtest-terminal');
     term.style.display = 'block';
     term.innerHTML = '<div class="t-line t-log">▶ 正在启动回测流…</div>';
@@ -261,48 +260,29 @@ function startStreamBacktest() {
 
     es.addEventListener('progress', function (e) {
         const d = JSON.parse(e.data);
-        // 进度条 + 统计数
-        const bar = '█'.repeat(Math.floor(d.percent / 5)) + '░'.repeat(20 - Math.floor(d.percent / 5));
-        const eta = d.eta_ms > 0 ? Math.round(d.eta_ms / 1000) + 's' : '完成中';
+        const filled = Math.floor(d.percent / 5);
+        const bar = '█'.repeat(filled) + '░'.repeat(20 - filled);
+        const eta = d.eta_ms > 0 ? (Math.round(d.eta_ms / 1000) + 's') : '完成中';
         term.innerHTML =
-            `<div class="t-line t-progress">[<span class="t-bar">${bar}</span>] ${d.percent}% ` +
-            `K线 ${d.kline_index}/${d.total_klines}  ` +
-            `成交 ${d.trades_count} 笔  ` +
-            `用时 ${Math.round(d.elapsed_ms/1000)}s  ETA ${eta}</div>` +
-            `<div class="t-line t-log">▶ /backtest/stream 接收中…</div>`;
+            '<div class="t-line t-progress">[<span class="t-bar">' + bar + '</span>] ' +
+            d.percent + '%  K线 ' + d.kline_index + '/' + d.total_klines + '  ' +
+            '成交 ' + d.trades_count + ' 笔  用时 ' +
+            Math.round(d.elapsed_ms / 1000) + 's  ETA ' + eta + '</div>';
         term.scrollTop = term.scrollHeight;
     });
 
     es.addEventListener('done', function (e) {
-        const d = JSON.parse(e.data);
-        es.close();
-        term.innerHTML += '<div class="t-line t-done">✓ 回测完成 ✓</div>';
-        renderInlineResult(d.result);
-        document.getElementById('backtest-submit-btn').disabled = false;
+        // 重定向到完整 result 页
+        window.location.href = '/backtest/result?jobid=' + JSON.parse(e.data).jobid;
     });
 
     es.addEventListener('error', function () {
         es.close();
-        term.innerHTML += '<div class="t-line t-error">✗ 连接错误，请刷新页面重试。</div>';
+        term.innerHTML += '<div class="t-line t-error">✗ 连接错误，请刷新重试。</div>';
         document.getElementById('backtest-submit-btn').disabled = false;
     });
 
     return false; // 阻止表单原生 POST
-}
-
-// 行内 result 渲染（简易）
-function renderInlineResult(r) {
-    const el = document.getElementById('backtest-result-inline');
-    el.style.display = 'block';
-    el.innerHTML = `
-        <div class="card radius-card">
-            <h3>回测结果</h3>
-            <div class="metric-card"><span class="metric-value">${r.total_return_pct}%</span><span class="metric-label">总收益率</span></div>
-            <div class="metric-card"><span class="metric-value">${r.max_drawdown_pct}%</span><span class="metric-label">最大回撤</span></div>
-            <div class="metric-card"><span class="metric-value">${r.win_rate_pct}%</span><span class="metric-label">胜率</span></div>
-            <div class="metric-card"><span class="metric-value">${r.total_trades}</span><span class="metric-label">总成交</span></div>
-        </div>`;
-    el.scrollIntoView({behavior: 'smooth'});
 }
 </script>
 {% endblock %}

@@ -88,6 +88,22 @@ class TestStreamRoute:
                        "&quantity_per_grid=0.01&start_time=2024-01-01&end_time=2024-01-05")
         assert r.status_code == 400
 
+    def test_result_page_renders_from_jobid(self, app, client):
+        """jobid 重定向到完整 result 页。"""
+        r = client.get("/backtest/stream?symbol=BTCUSDT&interval=1h&capital=10000"
+                       "&upper_price=110&lower_price=90&grid_size=5"
+                       "&quantity_per_grid=0.01&start_time=1970-01-01&end_time=1970-01-03")
+        assert r.status_code == 200
+        body = r.data.decode()
+        lines = body.split("\n")
+        done_idx = next(i for i, l in enumerate(lines) if l.startswith("event: done"))
+        data_line = lines[done_idx + 1]
+        jobid = json.loads(data_line[6:])["jobid"]
+        # 再请求 result 页面
+        r2 = client.get("/backtest/result?jobid=" + jobid)
+        assert r2.status_code == 200
+        assert b"total_return_pct" in r2.data or "回测结果".encode("utf-8") in r2.data
+
     def test_stream_done_event_includes_result(self, client):
         """成功流：done 事件包含 result 字段。"""
         # 测试 K 线时间戳从 0 (1970-01-01) 开始
@@ -106,9 +122,8 @@ class TestStreamRoute:
         done_indices = [i for i, l in enumerate(lines) if l.startswith("event: done")]
         assert len(progress_indices) >= 2, f"应多次推 progress，实际 {len(progress_indices)} 次"
         assert progress_indices[0] < done_indices[0], "第一个 progress 应在 done 之前"
-        # 解析 done 的 payload
+        # 解析 done 的 payload（含 jobid）
         data_line = lines[done_indices[0] + 1] if done_indices[0] + 1 < len(lines) else ""
         assert data_line.startswith("data: ")
         payload = json.loads(data_line[6:])
-        assert "result" in payload
-        assert "total_trades" in payload["result"]
+        assert "jobid" in payload
